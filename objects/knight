@@ -1,0 +1,154 @@
+import random
+
+class Knight:
+    # The Three Feats that every Knight knows
+    FEATS = ["Smite", "Focus", "Deny"]
+    
+    # The Knight's Oath
+    OATH = ["Seek the Myths", "Honour the Seers", "Protect the Realm"]
+    
+    def __init__(self, name="Unnamed Knight"):
+        self.name = name
+        
+        # Core Attributes - Roll d6 for each, then add d6 when knighted
+        self.vigour = self.roll_d6() + self.roll_d6()
+        self.clarity = self.roll_d6() + self.roll_d6() 
+        self.spirit = self.roll_d6() + self.roll_d6()
+        
+        # Guard - Roll d6 (rules say "Roll for Guard (GD)" and show d6)
+        self.guard = self.roll_d6()
+        
+        # Standard Knight Equipment
+        self.equipment = {
+            'dagger': 'd6',
+            'torch': True,
+            'rope': True,
+            'dry_rations': True,
+            'camping_gear': True
+        }
+        
+        # Assign equipment based on virtues (d6 roll for each)
+        self._assign_virtue_equipment()
+        
+        # Knight characteristics (to be assigned)
+        self.property = None    # Items brought with you
+        self.ability = None     # Special talent unique to you  
+        self.passion = None     # Special means to restore Spirit
+        
+        # Squire status
+        self.has_squire = False
+        
+    def roll_d6(self):
+        """Roll a standard d6"""
+        return random.randint(1, 6)
+    
+    def _assign_virtue_equipment(self):
+        """Assign equipment based on virtue rolls"""
+        # Roll d6 for equipment assignment as per rules
+        equipment_roll = self.roll_d6()
+        
+        equipment_options = {
+            1: ('cudgel', 'd8 hefty'),
+            2: ('axe', 'd8 hefty'), 
+            3: ('hatchet', 'd6'),
+            4: ('shortbow', 'd6 long'),
+            5: ('shield', 'd4, A1'),
+            6: ('javelins', 'd6')
+        }
+        
+        item_name, item_stats = equipment_options[equipment_roll]
+        self.equipment[item_name] = item_stats
+    
+    def assign_squire(self):
+        """Assign a squire (small companies only)"""
+        if not self.has_squire:
+            self.has_squire = True
+            # Squires add 2d6 to each virtue and carry a dagger
+            return f"{self.name} gains a squire! (+2d6 to each virtue, carries dagger)"
+        return f"{self.name} already has a squire"
+    
+    def make_save(self, virtue_type, difficulty=None):
+        """Make a save using specified virtue"""
+        virtue_value = getattr(self, virtue_type.lower())
+        roll = random.randint(1, 20)
+        
+        if difficulty:
+            success = roll <= difficulty
+        else:
+            success = roll <= virtue_value
+            
+        return {
+            'success': success,
+            'roll': roll,
+            'virtue': virtue_value,
+            'virtue_type': virtue_type
+        }
+    
+    def take_damage(self, amount):
+        """Take damage, reducing from Guard first, then Vigour"""
+        if self.guard > 0:
+            damage_to_guard = min(amount, self.guard)
+            self.guard -= damage_to_guard
+            amount -= damage_to_guard
+            
+        if amount > 0:
+            self.vigour -= amount
+            
+        return self.get_status()
+    
+    def get_status(self):
+        """Get current health status"""
+        if self.vigour <= 0:
+            return "Slain"
+        elif self.vigour <= self.vigour // 2:  # Rough half-health check
+            return "Mortally Wounded"  
+        elif self.guard == 0:
+            return "Exposed"
+        else:
+            return "Healthy"
+    
+    def __str__(self):
+        equipment_str = ', '.join([f"{k}: {v}" for k, v in self.equipment.items()])
+        
+        return f"""
+Knight: {self.name}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Virtues:
+  Vigour: {self.vigour} (Strong limbs, firm hands, powerful lungs)
+  Clarity: {self.clarity} (Keen instinct, lucid mind, shrewd eyes)  
+  Spirit: {self.spirit} (Charming tongue, iron will, fierce heart)
+
+Guard: {self.guard} (Skill at avoiding wounds)
+Status: {self.get_status()}
+
+Equipment: {equipment_str}
+
+Feats Known: {', '.join(self.FEATS)}
+Oath: {' | '.join(self.OATH)}
+
+Squire: {'Yes' if self.has_squire else 'No'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        """.strip()
+
+# Example usage
+if __name__ == "__main__":
+    # Create a new knight
+    knight = Knight("Sir Gareth the Bold")
+    print(knight)
+    
+    print("\n" + "="*50)
+    print("TESTING COMBAT")
+    print("="*50)
+    
+    # Test save
+    save_result = knight.make_save("Vigour")
+    print(f"\nVigour Save: {save_result}")
+    
+    # Test damage
+    print(f"\nTaking 3 damage...")
+    status = knight.take_damage(3)
+    print(f"Status: {status}")
+    print(f"Guard: {knight.guard}, Vigour: {knight.vigour}")
+    
+    # Assign squire
+    print(f"\n{knight.assign_squire()}")
