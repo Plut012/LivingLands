@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mythic Bastionlands</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- PLAN:
+    1. Main container with CSS Grid layout
+    2. Hex map canvas in center
+    3. Character sidebar on right
+    4. Terminal at bottom
+    5. Tab overlay system
+    -->
+    
+    <!-- Main Game Container -->
+    <div class="game-container">
+        <!-- Step 1: Hex Map Section -->
+        <section class="hex-map-section">
+            <canvas id="hex-canvas" width="800" height="600"></canvas>
+            <div class="fog-overlay"></div>
+        </section>
+        
+        <!-- Step 2: Character Display Sidebar -->
+        <aside class="character-sidebar">
+            <div class="character-portrait">
+                <img id="character-art" src="" alt="Knight">
+            </div>
+            <div class="virtues">
+                <div class="virtue-bar" data-virtue="vigour">
+                    <span class="label">Vigour</span>
+                    <div class="bar"><div class="fill"></div></div>
+                    <span class="value">0</span>
+                </div>
+                <div class="virtue-bar" data-virtue="clarity">
+                    <span class="label">Clarity</span>
+                    <div class="bar"><div class="fill"></div></div>
+                    <span class="value">0</span>
+                </div>
+                <div class="virtue-bar" data-virtue="spirit">
+                    <span class="label">Spirit</span>
+                    <div class="bar"><div class="fill"></div></div>
+                    <span class="value">0</span>
+                </div>
+            </div>
+            <div class="status-indicators">
+                <div class="guard-display">Guard: <span id="guard-value">0</span></div>
+                <div class="wounds-display">Wounds: <span id="wounds-value">0</span></div>
+            </div>
+        </aside>
+        
+        <!-- Step 3: Terminal Interface -->
+        <section class="terminal-section">
+            <div class="terminal-output" id="terminal-output"></div>
+            <div class="terminal-input-line">
+                <span class="prompt">></span>
+                <input type="text" id="terminal-input" class="terminal-input" autofocus>
+            </div>
+        </section>
+        
+        <!-- Step 4: Tab Overlay System -->
+        <div class="tab-overlay" id="tab-overlay" style="display: none;">
+            <nav class="tab-nav">
+                <button class="tab-button" data-tab="inventory">Inventory</button>
+                <button class="tab-button" data-tab="company">Company</button>
+                <button class="tab-button" data-tab="journal">Journal</button>
+                <button class="tab-button" data-tab="rules">Rules</button>
+                <button class="tab-close">×</button>
+            </nav>
+            <div class="tab-content" id="tab-content"></div>
+        </div>
+    </div>
+    
+    <!-- Step 5: Load JavaScript Modules -->
+    <script src="game.js"></script>
+    <script src="terminal.js"></script>
+    <script src="hex-map.js"></script>
+    <script src="character-display.js"></script>
+    <script src="tension-system.js"></script>
+    <script src="tab-manager.js"></script>
+    <script src="inventory.js"></script>
+    <script src="atmosphere.js"></script>
+</body>
+</html>
