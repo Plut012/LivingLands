@@ -27,7 +27,7 @@ async def process_input(request: InputRequest):
         # Create session if none exists (simplified - no character creation)
         session_id = "default_session"
         if not game_controller.get_session(session_id):
-            game_controller.create_session("Player")
+            game_controller.create_session("Pluto")
             # Override with our default session_id
             game_state = game_controller.active_sessions.pop(list(game_controller.active_sessions.keys())[-1])
             game_controller.active_sessions[session_id] = game_state

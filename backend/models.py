@@ -14,6 +14,9 @@ from datetime import datetime
 class Character:
     """Simple character representation"""
     name: str
+    description: Optional[str] = None
+    player_party: Optional[bool] = None
+    # age: Optional[int] = None
     stats: Dict[str, int] = field(default_factory=dict)  # Flexible stats (VIG, CLA, SPI, etc.)
     inventory: List[str] = field(default_factory=list)
     status: Dict[str, Any] = field(default_factory=dict)  # Wounds, conditions, etc.
@@ -26,10 +29,18 @@ class Character:
         """Set a character stat"""
         self.stats[stat_name] = value
 
+# @dataclass
+# class Knight(Character):
+#     super.__init__()
+#     passion: str
+#     ability: str
+
 @dataclass
 class GameState:
     """Flexible game state container"""
     session_id: str
+    time_of_day: str
+    recent_user_intent: str = field(default_factory=str)
     characters: List[Character] = field(default_factory=list)
     world_data: Dict[str, Any] = field(default_factory=dict)  # Current location, discovered areas, etc.
     game_data: Dict[str, Any] = field(default_factory=dict)   # Turn count, active events, etc.
@@ -67,26 +78,34 @@ class GameState:
         }
 
 # Helper functions
-def create_basic_character(name: str, stats: Dict[str, int] = None) -> Character:
+def create_knight(name: str, description: str, player_party: bool, stats: Dict[str, int] = None) -> Character:
     """Create a basic character with default stats"""
+    # ROLL to select knight - IMPORTANT from set of knights not in world already
+    # Get knights special traits: passion, ability, items, ...
+
+    # TODO if stats = None - roll for stats
     default_stats = {"VIG": 10, "CLA": 10, "SPI": 10, "GD": 5}
     if stats:
         default_stats.update(stats)
     
     return Character(
         name=name,
+        description=description,
+        player_party=player_party,
         stats=default_stats,
         inventory=["basic gear"],
         status={"wounds": 0, "conditions": []}
     )
 
-def create_new_game(session_id: str, character_name: str) -> GameState:
+def create_new_game(session_id: str, character_name: str, description: str) -> GameState:
     """Create a new game session"""
-    character = create_basic_character(character_name)
+    character = create_knight(character_name, description, player_party=True)
     
     return GameState(
         session_id=session_id,
         characters=[character],
+        time_of_day='morning',
+        recent_user_intent='',
         world_data={"current_location": "Starting Area", "discovered_areas": []},
         game_data={"turn_count": 0, "active_events": []}
     )

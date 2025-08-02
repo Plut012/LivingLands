@@ -75,7 +75,7 @@ const IntentButtons = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    input: `I want to ${intent.toLowerCase()}`,
+                    input: `user is deciding intent`,
                     selected_intent: intent
                 })
             });

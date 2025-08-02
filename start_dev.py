@@ -17,7 +17,7 @@ def main():
     backend_dir = Path(__file__).parent / "backend"
     
     # Check if virtual environment exists
-    venv_dir = Path(__file__).parent / "venv"
+    venv_dir = Path(__file__).parent / ".venv"
     python_executable = sys.executable
     
     if not venv_dir.exists():
@@ -33,8 +33,8 @@ def main():
         pip_executable = str(venv_dir / "bin" / "pip")
     
     # Install requirements
-    print("📦 Installing dependencies...")
-    subprocess.run([pip_executable, "install", "-r", str(backend_dir / "requirements.txt")])
+    # print("📦 Installing dependencies...")
+    # subprocess.run([pip_executable, "install", "-r", str(backend_dir / "requirements.txt")])
     
     # Check if Ollama is running
     try:
@@ -65,7 +65,7 @@ def main():
         python_executable, "-m", "uvicorn", 
         "main:app", 
         "--host", "0.0.0.0", 
-        "--port", "8000", 
+        "--port", "8001",
         "--reload"
     ])
 

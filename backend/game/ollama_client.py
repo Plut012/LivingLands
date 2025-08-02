@@ -30,7 +30,7 @@ class PromptTemplate:
 class OllamaClient:
     """Flexible Ollama client for game interactions"""
     
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.1"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "tohur:latest"):
         self.base_url = base_url
         self.model = model
         self.templates = {}
@@ -42,39 +42,43 @@ class OllamaClient:
         # Game Master template for general narrative
         self.templates["gamemaster"] = PromptTemplate(
             name="gamemaster",
-            system_prompt="""You are the Game Master for Mythic Bastionland, a dark fantasy RPG. 
-You control the world, NPCs, and consequences of player actions.
-Be descriptive but concise. Focus on atmosphere and meaningful choices.
-Always end with what the player can do next.""",
-            user_template="""GAME STATE:
-{game_state}
-
-PLAYER ACTION: {player_action}
-
-Describe what happens and present 2-3 meaningful options for what the player can do next.""",
+            system_prompt="""
+            You are the Game Master for Mythic Bastionland, a dark fantasy RPG. 
+            You control the world, NPCs, and consequences of player actions.
+            Absolutely never switch roles or decide what the player does. You are ultimate judge / fate.
+            Be descriptive but concise. Focus on atmosphere and meaningful choices.
+            """,
+            user_template="""
+            GAME STATE: {game_state}
+            PLAYER ACTION: {player_action}
+            PLAYER INTENT: {player_intent}
+            Describe what happens - create pivotal / suspenseful moments and allow the user to decide what to do.
+            """,
             variables=["game_state", "player_action"]
         )
         
         # Action interpreter template
         self.templates["action_interpreter"] = PromptTemplate(
             name="action_interpreter",
-            system_prompt="""You are an action interpreter for a text RPG. 
-Parse player input and determine:
-1. What they want to do (intent)
-2. How risky it is (low/medium/high)
-3. What game mechanics might apply
-
-Respond in JSON format only.""",
-            user_template="""CURRENT SITUATION: {situation}
-PLAYER INPUT: {player_input}
-
-Analyze this action and respond with JSON:
-{
-    "intent": "clear description of what player wants to do",
-    "risk_level": "low/medium/high",
-    "mechanics": ["list", "of", "relevant", "game", "mechanics"],
-    "needs_roll": true/false
-}""",
+            system_prompt="""
+            You are an action interpreter for a text RPG. 
+            Parse player input and determine:
+            1. What they want to do (intent)
+            2. How risky it is (low/medium/high)
+            3. What game mechanics might apply
+            Respond in JSON format only.
+            """,
+            user_template="""
+            CURRENT SITUATION: {situation}
+            PLAYER INPUT: {player_input}
+            Analyze this action and respond with JSON:
+            {
+                "intent": "clear description of what player wants to do",
+                "risk_level": "low/medium/high",
+                "mechanics": ["list", "of", "relevant", "game", "mechanics"],
+                "needs_roll": true/false
+            }
+            """,
             variables=["situation", "player_input"]
         )
         
@@ -152,8 +156,7 @@ Make it mysterious and atmospheric, with potential for interaction.""",
         elif "world_builder" in system_prompt.lower():
             return "You find yourself in a mysterious location shrouded in mist. Ancient stone ruins emerge from the fog, their purpose lost to time. Strange symbols are carved into weathered walls, and you hear distant echoes that might be wind... or something else."
         else:
-            # General gamemaster response
-            return f"The world responds to your actions in ways both familiar and strange. You sense that your journey through the Mythic Bastionland is just beginning, full of mysteries waiting to be uncovered."
+            return f"Your head swirls - Was it the food? The drink? - Your eyes drift closed, your body sags, and you snore before hitting the ground."
     
     def build_game_context(self, game_state: Any) -> str:
         """Build context string from game state for prompts"""

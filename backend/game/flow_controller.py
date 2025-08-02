@@ -32,21 +32,8 @@ class GameFlowController:
             "rest": self._handle_rest,
             "interact": self._handle_interact,
             "check": self._handle_check_status,
-            "inventory": self._handle_inventory,
+            # "inventory": self._handle_inventory,   # inventory management should not include language model
         })
-    
-    def create_session(self, character_name: str) -> str:
-        """Create a new game session"""
-        session_id = str(uuid.uuid4())
-        game_state = create_new_game(session_id, character_name)
-        self.active_sessions[session_id] = game_state
-        logger.info(f"Created new session {session_id} for character '{character_name}', total sessions: {len(self.active_sessions)}")
-        return session_id
-    
-    def get_session(self, session_id: str) -> Optional[GameState]:
-        """Get a game session"""
-        logger.debug(f"Looking for session {session_id}, available sessions: {list(self.active_sessions.keys())}")
-        return self.active_sessions.get(session_id)
     
     async def process_action(self, session_id: str, player_input: str, selected_intent: str = None) -> Dict[str, Any]:
         """Process a player action and return the result"""
@@ -56,12 +43,21 @@ class GameFlowController:
         if not game_state:
             logger.error(f"Session {session_id} not found")
             return {"error": "Session not found"}
-        
+
+        if selected_intent:    # when button pressed, update recent user intent
+            # update game state
+            game_state.recent_user_intent = selected_intent
+            return {}
+        elif game_state.recent_user_intent:
+            selected_intent = game_state.recent_user_intent
+            action_data = {'intent': selected_intent, 'player_input': player_input}
+
         try:
             # Step 1: Interpret the player's action
-            logger.debug("Step 1: Interpreting player action")
-            action_data = await self._interpret_action(game_state, player_input, selected_intent)
-            logger.info(f"Action interpreted as: {action_data.get('intent', 'unknown')}")
+            if not selected_intent:
+                logger.debug("Step 1: Interpreting player action")
+                action_data = await self._interpret_action(game_state, player_input)
+                logger.info(f"Action interpreted as: {action_data.get('intent', 'unknown')}")
             
             # Step 2: Execute the action
             logger.debug("Step 2: Executing action")
@@ -90,6 +86,8 @@ class GameFlowController:
             }
             
             logger.info(f"Action processing completed successfully for session {session_id}")
+            # TODO clear user intent
+            game_state.recent_user_intent = None
             return response
             
         except Exception as e:
@@ -99,23 +97,12 @@ class GameFlowController:
                 "session_id": session_id
             }
     
-    async def _interpret_action(self, game_state: GameState, player_input: str, selected_intent: str = None) -> Dict[str, Any]:
+    async def _interpret_action(self, game_state: GameState, player_input: str) -> Dict[str, Any]:
         """Interpret what the player wants to do"""
         
         # Build context for the AI
         context = ollama.build_game_context(game_state)
-        
-        # Use selected_intent if provided, otherwise use AI to interpret
-        if selected_intent:
-            # Direct intent mapping - skip AI interpretation
-            return {
-                "intent": selected_intent.lower(),
-                "player_input": player_input,
-                "risk_level": "low",
-                "mechanics": [],
-                "needs_roll": False
-            }
-        
+
         # Use AI to interpret the action
         try:
             response = await ollama.generate(
@@ -129,8 +116,9 @@ class GameFlowController:
                 action_data = json.loads(response)
             except json.JSONDecodeError:
                 # Fallback to simple interpretation
+                logger.error(f"Error interpreting action: {response}", exc_info=True)
                 action_data = {
-                    "intent": player_input,
+                    "player_input": player_input,
                     "risk_level": "low",
                     "mechanics": [],
                     "needs_roll": False
@@ -227,7 +215,6 @@ class GameFlowController:
         
         return {
             "narrative": narrative,
-            "options": ["Continue your journey", "Rest longer", "Check your status"]
         }
     
     async def _handle_interact(self, game_state: GameState, action_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -299,7 +286,8 @@ class GameFlowController:
         narrative = await ollama.generate(
             "gamemaster",
             game_state=context,
-            player_action=action_data.get("intent", "do something")
+            player_intent=action_data.get("intent", "do something"),
+            player_action = action_data.get("player_input", "")
         )
         
         return {
@@ -323,6 +311,21 @@ class GameFlowController:
             }
             for session_id, state in self.active_sessions.items()
         ]
+
+    def create_session(self, character_name: str) -> str:
+        """Create a new game session"""
+        session_id = str(uuid.uuid4())
+        game_state = create_new_game(session_id, character_name, description="New Player Character")
+        self.active_sessions[session_id] = game_state
+        logger.info(
+            f"Created new session {session_id} for character '{character_name}', total sessions: {len(self.active_sessions)}")
+        return session_id
+
+    def get_session(self, session_id: str) -> Optional[GameState]:
+        """Get a game session"""
+        logger.debug(f"Looking for session {session_id}, available sessions: {list(self.active_sessions.keys())}")
+        return self.active_sessions.get(session_id)
+
 
 # Global instance
 game_controller = GameFlowController()
