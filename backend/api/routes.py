@@ -1,390 +1,177 @@
-"""
-api/routes.py - API Routes for Mythic Bastionlands
+"""api/routes.py - Minimal API for Game Flow
 
-PLAN:
-1. Define request/response models
-2. Create game session endpoints
-3. Action processing endpoint
-4. Game state retrieval
-5. Character management
-
-FRAMEWORK:
-- Use Pydantic for validation
-- Keep endpoints focused
-- Return consistent response formats
+SIMPLE ENDPOINTS:
+- New game creation
+- Action processing
+- Game state retrieval
+- Development utilities
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
-from datetime import datetime
-import uuid
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Dict, Any, List, Optional
+import logging
 
-# Import game modules
-from models import GameSession, Company, Character, create_knight
-from actions import process_action, create_action, ActionResult
-from world import initialize_world, travel_cost
-from combat import start_combat
-from llm_client import interpret_player_input, generate_narrative, build_context
-from database import get_db
+from game.flow_controller import game_controller
 
-# STEP 1: Create router
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
-# STEP 2: Define request/response models
+# Request/Response models
 class NewGameRequest(BaseModel):
-    """Request to start a new game"""
-    company_name: str = Field(..., min_length=1, max_length=50)
-    knight_names: List[str] = Field(..., min_items=1, max_items=6)
-
-class GameResponse(BaseModel):
-    """Standard game response"""
-    session_id: str
-    narrative: str
-    game_state: Dict
-    options: Optional[List[str]] = None
+    character_name: str
 
 class ActionRequest(BaseModel):
-    """Player action request"""
     session_id: str
-    action_text: str = Field(..., min_length=1, max_length=500)
+    action: str
 
-class CommandRequest(BaseModel):
-    """Natural language command"""
+class GameResponse(BaseModel):
     session_id: str
-    command: str = Field(..., min_length=1, max_length=500)
+    narrative: str
+    game_state: Dict[str, Any]
+    options: Optional[List[str]] = None
 
-# STEP 3: In-memory session storage (replace with database)
-game_sessions: Dict[str, GameSession] = {}
+# Core game endpoints
+@router.post("/new-game")
+async def create_new_game(request: NewGameRequest):
+    """Start a new game session"""
+    try:
+        session_id = game_controller.create_session(request.character_name)
+        game_state = game_controller.get_session(session_id)
+        
+        narrative = f"""Welcome, {request.character_name}!
+        
+You stand at the edge of the known world, where civilization gives way to mystery and danger. 
+The Mythic Bastionland stretches before you - a realm of fallen industry, ancient powers, and forgotten truths.
 
-# STEP 4: Session endpoints for frontend compatibility
-@router.post("/session/start")
-async def start_session():
-    """Start a new session - frontend compatibility endpoint"""
-    session_id = str(uuid.uuid4())
-    return {"sessionId": session_id}
+Your journey begins..."""
+        
+        return {
+            "session_id": session_id,
+            "narrative": narrative,
+            "game_state": game_state.to_dict(),
+            "options": ["Explore the area", "Check your status", "Head into the wilderness"]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating new game: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/session/save")
-async def save_session(data: dict):
-    """Save session data - frontend compatibility endpoint"""
-    return {"status": "saved"}
+@router.post("/action")
+async def process_action(request: ActionRequest):
+    """Process a player action"""
+    try:
+        result = await game_controller.process_action(request.session_id, request.action)
+        
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error processing action: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# STEP 4: New game endpoint
-@router.post("/new-game", response_model=GameResponse)
-async def new_game(request: NewGameRequest):
-    """Initialize a new game session"""
-    
-    # Generate session ID
-    session_id = str(uuid.uuid4())
-    
-    # STEP 4.1: Create knights
-    knights = []
-    for name in request.knight_names:
-        # Roll random stats (simplified)
-        import random
-        knight = create_knight(
-            name=name,
-            vig=random.randint(8, 15),
-            cla=random.randint(8, 15),
-            spi=random.randint(8, 15),
-            gd=random.randint(4, 8)
-        )
-        knights.append(knight)
-    
-    # STEP 4.2: Create company
-    company = Company(name=request.company_name, knights=knights)
-    
-    # STEP 4.3: Initialize world
-    world = initialize_world()
-    
-    # STEP 4.4: Create game session
-    session = GameSession(
-        session_id=session_id,
-        company=company,
-        current_hex=(0, 0),
-        world_hexes=world
-    )
-    
-    # Store session
-    game_sessions[session_id] = session
-    
-    # STEP 4.5: Generate opening narrative
-    narrative = f"""
-    The {company.name} stands ready at the edge of the realm.
-    {len(knights)} knights have sworn the oath:
-    Seek the Myths. Honour the Seers. Protect the Realm.
-    
-    Your journey begins in the borderlands...
-    """
-    
-    return GameResponse(
-        session_id=session_id,
-        narrative=narrative.strip(),
-        game_state={
-            "company": company.name,
-            "knights": [k.name for k in knights],
-            "location": "Starting Hex",
-            "turn": 0
-        },
-        options=["Explore the area", "Travel north", "Make camp"]
-    )
-
-# STEP 5: Get game state endpoint
-@router.get("/game-state/{session_id}", response_model=GameResponse)
+@router.get("/game/{session_id}")
 async def get_game_state(session_id: str):
     """Get current game state"""
-    
-    # Retrieve session
-    session = game_sessions.get(session_id)
-    if not session:
+    game_state = game_controller.get_session(session_id)
+    if not game_state:
         raise HTTPException(status_code=404, detail="Game session not found")
-    
-    # Get current hex
-    current_hex = session.get_current_hex()
-    
-    # Build state summary
-    game_state = {
-        "company": session.company.name,
-        "location": current_hex.landmark if current_hex and current_hex.landmark else "Wilderness",
-        "turn": session.turn_count,
-        "knights": [
-            {
-                "name": k.name,
-                "guard": k.guard,
-                "max_guard": k.max_guard,
-                "wounds": len(k.wounds)
-            }
-            for k in session.company.knights
-        ]
-    }
-    
-    return GameResponse(
-        session_id=session_id,
-        narrative="You survey your surroundings...",
-        game_state=game_state,
-        options=["Explore", "Travel", "Rest", "Check equipment"]
-    )
-
-# STEP 6: Process action endpoint
-@router.post("/action", response_model=GameResponse)
-async def process_player_action(request: ActionRequest):
-    """Process a player action"""
-    
-    # Retrieve session
-    session = game_sessions.get(request.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Game session not found")
-    
-    # STEP 6.1: Create context and interpret action
-    context = build_context(session)
-    action_parts = interpret_player_input(request.action_text, context)
-    
-    # STEP 6.2: Create action object
-    action = create_action(
-        intent=action_parts["intent"],
-        leverage=action_parts["leverage"],
-        has_cost=action_parts.get("cost") is not None,
-        is_risky=action_parts.get("risk") != "no_risk"
-    )
-    
-    # STEP 6.3: Process the action
-    # For now, assume success for no-risk actions
-    if action.risk.value == "no_risk":
-        result = process_action(action, session.company.knights[0])
-    else:
-        # Would need dice roll here
-        result = process_action(action, session.company.knights[0], (True, 10))
-    
-    # STEP 6.4: Generate narrative
-    narrative = generate_narrative(session, result.outcome, {"action": action.intent})
-    
-    # STEP 6.5: Update game state
-    session.turn_count += 1
-    
-    return GameResponse(
-        session_id=request.session_id,
-        narrative=narrative,
-        game_state={
-            "last_action": action.intent,
-            "outcome": result.outcome.value,
-            "turn": session.turn_count
-        }
-    )
-
-# STEP 7: Character details endpoint
-@router.get("/character/{session_id}/{character_name}")
-async def get_character(session_id: str, character_name: str):
-    """Get detailed character information"""
-    
-    # Retrieve session
-    session = game_sessions.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Game session not found")
-    
-    # Find character
-    character = None
-    for knight in session.company.knights:
-        if knight.name.lower() == character_name.lower():
-            character = knight
-            break
-    
-    if not character:
-        raise HTTPException(status_code=404, detail="Character not found")
-    
-    # Build detailed info
-    return {
-        "name": character.name,
-        "is_knight": character.is_knight,
-        "virtues": {
-            "vigour": character.virtues.get("VIG", 0),
-            "clarity": character.virtues.get("CLA", 0),
-            "spirit": character.virtues.get("SPI", 0)
-        },
-        "guard": {
-            "current": character.guard,
-            "max": character.max_guard
-        },
-        "equipment": character.equipment,
-        "wounds": character.wounds,
-        "status": {
-            "exhausted": character.virtues.get("VIG", 1) == 0,
-            "exposed": character.virtues.get("CLA", 1) == 0,
-            "impaired": character.virtues.get("SPI", 1) == 0
-        }
-    }
-
-# STEP 8: Natural language command endpoint
-@router.post("/command")
-async def process_command(request: dict):
-    """Process natural language commands"""
-    
-    # Debug: Print what we received
-    print(f"DEBUG: Received request: {request}")
-    
-    # Validate required fields manually
-    if 'session_id' not in request:
-        return {"error": "Missing session_id field"}
-    if 'command' not in request:
-        return {"error": "Missing command field"}
-    
-    session_id = request['session_id']
-    command = request['command']
-    
-    # Auto-create session if none exists
-    session = game_sessions.get(session_id)
-    if not session:
-        # Create a basic session for testing
-        from models import Company, create_knight
-        knights = [create_knight("Test Knight", 12, 10, 8, 6)]
-        company = Company(name="Test Company", knights=knights)
-        from world import initialize_world
-        world = initialize_world()
-        from models import GameSession
-        
-        session = GameSession(
-            session_id=session_id,
-            company=company,
-            current_hex=(0, 0),
-            world_hexes=world
-        )
-        game_sessions[session_id] = session
-    
-    # STEP 8.1: Interpret command
-    command_lower = command.lower()
-    
-    # STEP 8.2: Handle specific commands
-    if "status" in command_lower or "check" in command_lower:
-        # Return status - simplified for testing
-        return {
-            "session_id": session_id,
-            "narrative": "You check your status...",
-            "game_state": {"company": session.company.name, "turn": session.turn_count}
-        }
-    
-    elif "rest" in command_lower or "camp" in command_lower:
-        # Handle rest action
-        narrative = "The company makes camp for the night. Guards are restored after a peaceful rest."
-        for knight in session.company.knights:
-            knight.guard = knight.max_guard
-        
-        return {
-            "session_id": session_id,
-            "narrative": narrative,
-            "game_state": {"action": "rest", "guards_restored": True}
-        }
-    
-    elif any(word in command_lower for word in ["move", "travel", "go"]):
-        # Handle travel
-        direction = "north"  # Would parse from command
-        narrative = f"The company travels {direction} through the wilderness..."
-        
-        # Simple movement
-        x, y = session.current_hex
-        session.current_hex = (x, y + 1)
-        
-        return {
-            "session_id": session_id,
-            "narrative": narrative,
-            "game_state": {"moved_to": session.current_hex}
-        }
-    
-    else:
-        # Process as general action - simplified response for testing
-        return {
-            "session_id": session_id,
-            "narrative": f"You attempt to: {command}",
-            "game_state": {"action": command, "turn": session.turn_count}
-        }
-
-# STEP 9: Combat initiation endpoint
-@router.post("/combat/start")
-async def start_combat_encounter(session_id: str, enemy_type: str = "bandits"):
-    """Start a combat encounter"""
-    
-    # Retrieve session
-    session = game_sessions.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Game session not found")
-    
-    # Define some basic enemies
-    enemy_templates = {
-        "bandits": [
-            {"name": "Bandit Leader", "vig": 8, "cla": 6, "gd": 4, "armor": 1},
-            {"name": "Bandit", "vig": 5, "cla": 5, "gd": 2, "armor": 0},
-            {"name": "Bandit", "vig": 5, "cla": 5, "gd": 2, "armor": 0}
-        ],
-        "wolves": [
-            {"name": "Alpha Wolf", "vig": 7, "cla": 8, "gd": 0, "armor": 0},
-            {"name": "Wolf", "vig": 5, "cla": 6, "gd": 0, "armor": 0}
-        ]
-    }
-    
-    enemies = enemy_templates.get(enemy_type, enemy_templates["bandits"])
-    
-    # Start combat
-    combat_state = start_combat(session.company.knights, enemies)
-    session.active_combat = combat_state
     
     return {
-        "combat_started": True,
-        "enemies": [e["name"] for e in enemies],
-        "initiative_order": combat_state.initiative_order,
-        "narrative": f"Combat begins! {len(enemies)} {enemy_type} attack!"
+        "session_id": session_id,
+        "game_state": game_state.to_dict(),
+        "narrative": "You take a moment to assess your situation...",
+        "options": ["Continue", "Rest", "Check status"]
     }
 
-# STEP 10: List active sessions endpoint (for debugging)
+# Development and utility endpoints
 @router.get("/sessions")
 async def list_sessions():
     """List all active game sessions"""
     return {
-        "active_sessions": len(game_sessions),
-        "sessions": [
-            {
-                "id": sid,
-                "company": s.company.name,
-                "turn": s.turn_count,
-                "location": s.current_hex
-            }
-            for sid, s in game_sessions.items()
-        ]
+        "sessions": game_controller.list_sessions()
+    }
+
+@router.get("/templates")
+async def list_prompt_templates():
+    """List available AI prompt templates"""
+    from game.ollama_client import ollama
+    return {
+        "templates": ollama.list_templates()
+    }
+
+@router.post("/test-prompt")
+async def test_prompt(data: dict):
+    """Test a prompt template with custom data"""
+    from game.ollama_client import ollama
+    
+    template_name = data.get("template")
+    kwargs = data.get("data", {})
+    
+    if not template_name:
+        raise HTTPException(status_code=400, detail="Template name required")
+    
+    try:
+        result = await ollama.generate(template_name, **kwargs)
+        return {"result": result}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/experiment")
+async def create_prompt_experiment(data: dict):
+    """Create and test a new prompt template"""
+    from game.ollama_client import ollama
+    
+    name = data.get("name")
+    system = data.get("system")
+    user = data.get("user")
+    variables = data.get("variables", [])
+    test_data = data.get("test_data", {})
+    
+    if not all([name, system, user]):
+        raise HTTPException(status_code=400, detail="Name, system, and user prompts required")
+    
+    try:
+        template = ollama.create_prompt_experiment(name, system, user, variables)
+        
+        # Test the template if test data provided
+        result = None
+        if test_data:
+            result = await ollama.generate(f"experiment_{name}", **test_data)
+        
+        return {
+            "template_created": template.name,
+            "test_result": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Health check
+@router.get("/health")
+async def health_check():
+    """API health check"""
+    return {"status": "healthy", "active_sessions": len(game_controller.active_sessions)}
+
+# API Status endpoint (for compatibility)
+@router.get("/status") 
+async def api_status():
+    """API status with endpoint info"""
+    return {
+        "status": "active",
+        "game": "Mythic Bastionland",
+        "version": "0.1.0",
+        "endpoints": {
+            "new_game": "/api/v1/new-game",
+            "action": "/api/v1/action",
+            "sessions": "/api/v1/sessions",
+            "health": "/api/v1/health"
+        },
+        "development": {
+            "templates": "/api/v1/templates", 
+            "test_prompt": "/api/v1/test-prompt",
+            "experiment": "/api/v1/experiment"
+        }
     }

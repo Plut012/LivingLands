@@ -12,63 +12,36 @@ Living Lands is my intepretation of TTRPG Mythic Bastionlands into a digital env
 
 
 Mythic Bastionlands - System Overview
+Core Components:
 
-  Core Components
+  📁 models.py - Simple game state
+  - Character - flexible stats, inventory, status
+  - GameState - holds characters, world data, action history
+  - Easy to extend with new properties
 
-  Frontend (Web Interface)
-  ├── game.js - Main state & API communication
-  ├── terminal.js - Command input/output
-  ├── character-display.js - Character stats UI
-  └── index.html - Main game interface
+  📁 game/ollama_client.py - Flexible AI integration
+  - PromptTemplate system for different scenarios
+  - Built-in templates: gamemaster, action_interpreter, world_builder
+  - Easy prompt experimentation with /experiment endpoint
 
-  Backend (FastAPI Server)
-  ├── main.py - Server entry point
-  ├── api/routes.py - HTTP endpoints
-  ├── models.py - Game data structures
-  ├── database.py - SQLite persistence
-  ├── llm_client.py - Ollama integration
-  ├── actions.py - Game mechanics
-  ├── combat.py - Combat system
-  ├── world.py - Map generation
-  └── dice.py - Random mechanics
+  📁 game/flow_controller.py - Game flow management
+  - Processes player actions → AI interpretation → game response
+  - Pluggable action handlers (explore, travel, rest, etc.)
+  - Coordinates between game systems and AI
 
-  External Services
-  └── Ollama (LLM) - Narrative generation
+  📁 api/routes.py - Clean API endpoints
+  - /new-game - start sessions
+  - /action - process player input
+  - /templates - view AI prompts
+  - /experiment - test new prompts
 
-  Data Flow
+  Where to Start Developing:
 
-  1. Player Input
-     Browser → Terminal → game.js → API
+  1. Game Mechanics → Add handlers in flow_controller.py:_setup_default_handlers()
+  2. AI Prompts → Create templates in ollama_client.py or via /experiment endpoint
+  3. New Systems → Extend GameState in models.py, add handler functions
+  4. Testing Ideas → Use /test-prompt and /experiment endpoints
 
-  2. Game Processing
-     API → Game Logic → Database → LLM → Response
+  Development Flow:
 
-  3. Output Display
-     Response → game.js → Terminal → Browser
-
-  Component Links
-
-  - Frontend ↔ Backend: REST API (/api/v1/command)
-  - Backend ↔ Database: SQLAlchemy ORM (SQLite file)
-  - Backend ↔ LLM: HTTP requests (Ollama API)
-  - Game Logic: Actions → Dice → World → Combat (internal)
-
-  Game Flow
-
-  1. Start: Player opens browser → Auto-creates session
-  2. Input: Player types command → Sent to backend
-  3. Process: Backend interprets command → Applies game rules
-  4. Generate: LLM creates narrative response
-  5. Store: Save state to database
-  6. Display: Return narrative + game state to frontend
-  7. Repeat: Next player command
-
-  Current State
-
-  - ✅ All components exist and connected
-  - ✅ Basic command processing works
-  - ✅ Database auto-creates sessions
-  - ⚠️ LLM integration needs testing
-  - ⚠️ Frontend cache issues (use Ctrl+F5)
-
-  Entry Point: python3 start_dev.py → http://localhost:8000
+  Player Input → AI Interpretation → Action Handler → Game State Update → AI Response
