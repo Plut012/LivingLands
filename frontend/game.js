@@ -37,7 +37,7 @@ const GameState = {
 
 // Step 2: API Communication Layer
 const API = {
-    baseUrl: '/api',
+    baseUrl: '/api/v1',
     
     async sendCommand(command) {
         try {
