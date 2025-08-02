@@ -22,18 +22,15 @@ import logging
 import os
 from typing import Dict
 
-# Import our modules
 from api.routes import router as api_router
 from database import init_db, get_db
 
-# STEP 1: Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# STEP 2: Define lifespan handler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handle startup and shutdown events"""
@@ -47,7 +44,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down...")
 
-# STEP 3: Create FastAPI app
+# Create app
 app = FastAPI(
     title="Mythic Bastionlands API",
     description="Backend API for Mythic Bastionlands text adventure game",
@@ -55,7 +52,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# STEP 4: Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production

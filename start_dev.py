@@ -36,23 +36,10 @@ def main():
     print("📦 Installing dependencies...")
     subprocess.run([pip_executable, "install", "-r", str(backend_dir / "requirements.txt")])
     
-    # Check if Ollama is running (WSL-aware)
-    ollama_url = "http://localhost:11434"
-    try:
-        # Try to detect WSL and use Windows host IP
-        with open('/etc/resolv.conf', 'r') as f:
-            for line in f:
-                if 'nameserver' in line:
-                    host_ip = line.split()[1]
-                    ollama_url = f"http://{host_ip}:11434"
-                    break
-    except:
-        pass
-    
+    # Check if Ollama is running
     try:
         import requests
-        print(f"🔍 Checking Ollama at {ollama_url}...")
-        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
         if response.status_code == 200:
             models = response.json().get('models', [])
             model_names = [m.get('name', '') for m in models]
@@ -61,8 +48,7 @@ def main():
             print("⚠️  Ollama may not be properly configured")
     except Exception as e:
         print(f"❌ Ollama connection failed: {e}")
-        print(f"   Tried connecting to: {ollama_url}")
-        print("   Make sure Ollama is running on Windows")
+        print("   Make sure Ollama is running: ollama serve")
         print("\nContinuing anyway...")
     
     # Start the server

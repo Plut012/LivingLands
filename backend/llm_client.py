@@ -23,21 +23,7 @@ from actions import Action, ActionOutcome
 
 class LLMClient:
     """Wrapper for Ollama API calls"""
-    def __init__(self, base_url: str = None, model: str = "tohur:latest"):
-        # Auto-detect if running in WSL and connect to Windows host
-        if base_url is None:
-            try:
-                with open('/etc/resolv.conf', 'r') as f:
-                    for line in f:
-                        if 'nameserver' in line:
-                            host_ip = line.split()[1]
-                            base_url = f"http://{host_ip}:11434"
-                            break
-                if base_url is None:
-                    base_url = "http://localhost:11434"  # fallback
-            except:
-                base_url = "http://localhost:11434"  # fallback
-        
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5:latest"):
         self.base_url = base_url
         self.model = model
     

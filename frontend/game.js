@@ -45,7 +45,7 @@ const API = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionId: GameState.sessionId,
+                    session_id: GameState.sessionId,
                     command: command
                 })
             });

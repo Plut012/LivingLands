@@ -6,23 +6,9 @@ import requests
 import json
 
 def test_ollama():
-    # Auto-detect WSL and use Windows host IP
-    ollama_url = "http://localhost:11434"
-    try:
-        with open('/etc/resolv.conf', 'r') as f:
-            for line in f:
-                if 'nameserver' in line:
-                    host_ip = line.split()[1]
-                    ollama_url = f"http://{host_ip}:11434"
-                    break
-    except:
-        pass
-    
-    print(f"🔍 Testing Ollama at {ollama_url}")
-    
     try:
         # Test if Ollama is running
-        response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
         if response.status_code == 200:
             models = response.json().get('models', [])
             print("✅ Ollama is running!")
@@ -31,11 +17,11 @@ def test_ollama():
                 print(f"  - {model.get('name', 'Unknown')}")
             
             # Test a simple generation
-            print("\n🧪 Testing generation with tohur:latest...")
+            print("\n🧪 Testing generation with qwen2.5:latest...")
             gen_response = requests.post(
-                f"{ollama_url}/api/generate",
+                "http://localhost:11434/api/generate",
                 json={
-                    "model": "tohur:latest",
+                    "model": "qwen2.5:latest",
                     "prompt": "Write one sentence about a knight in a medieval setting:",
                     "stream": False,
                     "options": {"num_predict": 50}
