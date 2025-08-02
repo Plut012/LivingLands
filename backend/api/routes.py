@@ -17,6 +17,7 @@ router = APIRouter()
 # Single request model
 class InputRequest(BaseModel):
     input: str
+    selected_intent: str = None
 
 # Single route - everything goes to flow_controller
 @router.post("/input")
@@ -32,7 +33,7 @@ async def process_input(request: InputRequest):
             game_controller.active_sessions[session_id] = game_state
         
         # Send everything to flow_controller
-        result = await game_controller.process_action(session_id, request.input)
+        result = await game_controller.process_action(session_id, request.input, request.selected_intent)
         return result
         
     except Exception as e:

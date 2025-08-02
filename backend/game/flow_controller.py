@@ -48,9 +48,9 @@ class GameFlowController:
         logger.debug(f"Looking for session {session_id}, available sessions: {list(self.active_sessions.keys())}")
         return self.active_sessions.get(session_id)
     
-    async def process_action(self, session_id: str, player_input: str) -> Dict[str, Any]:
+    async def process_action(self, session_id: str, player_input: str, selected_intent: str = None) -> Dict[str, Any]:
         """Process a player action and return the result"""
-        logger.info(f"Processing action for session {session_id}: '{player_input}'")
+        logger.info(f"Processing action for session {session_id}: '{player_input}' with intent: {selected_intent}")
         
         game_state = self.get_session(session_id)
         if not game_state:
@@ -60,7 +60,7 @@ class GameFlowController:
         try:
             # Step 1: Interpret the player's action
             logger.debug("Step 1: Interpreting player action")
-            action_data = await self._interpret_action(game_state, player_input)
+            action_data = await self._interpret_action(game_state, player_input, selected_intent)
             logger.info(f"Action interpreted as: {action_data.get('intent', 'unknown')}")
             
             # Step 2: Execute the action
@@ -99,11 +99,22 @@ class GameFlowController:
                 "session_id": session_id
             }
     
-    async def _interpret_action(self, game_state: GameState, player_input: str) -> Dict[str, Any]:
+    async def _interpret_action(self, game_state: GameState, player_input: str, selected_intent: str = None) -> Dict[str, Any]:
         """Interpret what the player wants to do"""
         
         # Build context for the AI
         context = ollama.build_game_context(game_state)
+        
+        # Use selected_intent if provided, otherwise use AI to interpret
+        if selected_intent:
+            # Direct intent mapping - skip AI interpretation
+            return {
+                "intent": selected_intent.lower(),
+                "player_input": player_input,
+                "risk_level": "low",
+                "mechanics": [],
+                "needs_roll": False
+            }
         
         # Use AI to interpret the action
         try:
