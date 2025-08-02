@@ -41,15 +41,22 @@ const API = {
     
     async sendCommand(command) {
         try {
-            const response = await fetch(`${this.baseUrl}/command`, {
+            const response = await fetch(`${this.baseUrl}/input`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    session_id: GameState.sessionId,
-                    command: command
+                    input: command
                 })
             });
-            return await response.json();
+            const result = await response.json();
+            
+            // Update session ID if backend returned a new one
+            if (result.session_id && result.session_id !== GameState.sessionId) {
+                console.log(`Updating session ID from ${GameState.sessionId} to ${result.session_id}`);
+                GameState.sessionId = result.session_id;
+            }
+            
+            return result;
         } catch (error) {
             console.error('API Error:', error);
             return { error: 'Connection failed' };
@@ -147,6 +154,11 @@ const Game = {
             await API.startSession();
         }
         
+        // Register terminal if it exists
+        if (window.Terminal) {
+            ModuleManager.register('terminal', window.Terminal);
+        }
+        
         // Initialize modules
         ModuleManager.initialize();
         
@@ -186,13 +198,24 @@ const Game = {
             });
         } else {
             // Update game state
-            if (response.stateChanges) {
-                this.updateState(response.stateChanges);
+            if (response.game_state) {
+                this.updateState(response.game_state);
             }
             
-            // Display response
-            if (response.output) {
-                ModuleManager.broadcast('terminal:output', response.output);
+            // Display narrative response
+            if (response.narrative) {
+                ModuleManager.broadcast('terminal:output', {
+                    text: response.narrative,
+                    style: 'narrative'
+                });
+            }
+            
+            // Display options if available
+            if (response.options && response.options.length > 0) {
+                ModuleManager.broadcast('terminal:output', {
+                    text: '\nAvailable actions: ' + response.options.join(', '),
+                    style: 'options'
+                });
             }
             
             // Trigger any special effects

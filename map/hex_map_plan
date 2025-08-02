@@ -1,0 +1,44 @@
+Hexmap System Plan
+
+  Architecture Components
+
+  1. Backend Hex Data Model (Missing)
+  - Hex class with coordinates, terrain, features, exploration status
+  - World generation system for procedural hex content
+  - Persistence layer for discovered hexes
+
+  2. Frontend Integration (Partially Complete)
+  - Existing hex visualization needs backend data integration
+  - Add hex data fetching/caching from API
+  - Implement real-time hex updates
+
+  3. Movement System (Missing)
+  - Backend: Movement validation and state updates
+  - Frontend: Visual movement animations and current position tracking
+
+  4. Discovery/Exploration (Basic Structure Exists)
+  - Backend: Hex revelation logic, content generation
+  - Frontend: Fog of war updates, landmark placement
+
+  Implementation Roadmap
+
+  Phase 1: Core Hex Data Model (High Priority)
+  1. Create Hex dataclass in models.py
+  2. Add hex storage to GameState.world_data
+  3. Create hex generation utilities
+  4. Add movement handlers to flow controller
+
+  Phase 2: API Integration (High Priority)
+  1. Add hex data endpoints to API
+  2. Update frontend to fetch hex data
+  3. Sync frontend state with backend
+
+  Phase 3: Movement & Exploration (Medium Priority)
+  1. Implement movement validation
+  2. Add exploration mechanics
+  3. Create content generation for new hexes
+
+  Phase 4: Advanced Features (Low Priority)
+  1. Hex-based events and encounters
+  2. Terrain-specific mechanics
+  3. Save/load hex world state

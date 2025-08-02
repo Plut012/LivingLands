@@ -10,8 +10,11 @@ GAME FLOW CONTROL:
 from typing import Dict, Any, List, Optional, Tuple
 import uuid
 import json
+import logging
 from models import GameState, Character, create_new_game
 from game.ollama_client import ollama
+
+logger = logging.getLogger(__name__)
 
 class GameFlowController:
     """Controls the flow of the game"""
@@ -37,34 +40,47 @@ class GameFlowController:
         session_id = str(uuid.uuid4())
         game_state = create_new_game(session_id, character_name)
         self.active_sessions[session_id] = game_state
+        logger.info(f"Created new session {session_id} for character '{character_name}', total sessions: {len(self.active_sessions)}")
         return session_id
     
     def get_session(self, session_id: str) -> Optional[GameState]:
         """Get a game session"""
+        logger.debug(f"Looking for session {session_id}, available sessions: {list(self.active_sessions.keys())}")
         return self.active_sessions.get(session_id)
     
     async def process_action(self, session_id: str, player_input: str) -> Dict[str, Any]:
         """Process a player action and return the result"""
+        logger.info(f"Processing action for session {session_id}: '{player_input}'")
+        
         game_state = self.get_session(session_id)
         if not game_state:
+            logger.error(f"Session {session_id} not found")
             return {"error": "Session not found"}
         
         try:
             # Step 1: Interpret the player's action
+            logger.debug("Step 1: Interpreting player action")
             action_data = await self._interpret_action(game_state, player_input)
+            logger.info(f"Action interpreted as: {action_data.get('intent', 'unknown')}")
             
             # Step 2: Execute the action
+            logger.debug("Step 2: Executing action")
             result = await self._execute_action(game_state, action_data)
+            logger.info(f"Action executed successfully")
             
             # Step 3: Update game state
+            logger.debug("Step 3: Updating game state")
             game_state.add_history_entry(
                 action=player_input,
                 result=result.get("narrative", ""),
                 context=action_data
             )
-            game_state.game_data["turn_count"] = game_state.game_data.get("turn_count", 0) + 1
+            turn_count = game_state.game_data.get("turn_count", 0) + 1
+            game_state.game_data["turn_count"] = turn_count
+            logger.info(f"Game state updated, turn count now: {turn_count}")
             
             # Step 4: Generate response
+            logger.debug("Step 4: Generating response")
             response = {
                 "session_id": session_id,
                 "narrative": result.get("narrative", ""),
@@ -73,9 +89,11 @@ class GameFlowController:
                 "action_data": action_data
             }
             
+            logger.info(f"Action processing completed successfully for session {session_id}")
             return response
             
         except Exception as e:
+            logger.error(f"Error processing action '{player_input}' for session {session_id}: {str(e)}", exc_info=True)
             return {
                 "error": f"Error processing action: {str(e)}",
                 "session_id": session_id
@@ -123,13 +141,16 @@ class GameFlowController:
         """Execute the interpreted action"""
         
         intent = action_data.get("intent", "").lower()
+        logger.debug(f"Executing action with intent: '{intent}'")
         
         # Check for specific action handlers
         for action_type, handler in self.action_handlers.items():
             if action_type in intent:
+                logger.info(f"Using specific handler: {action_type}")
                 return await handler(game_state, action_data)
         
         # Default: Use AI to generate narrative response
+        logger.info("Using general AI handler for action")
         return await self._handle_general_action(game_state, action_data)
     
     async def _handle_explore(self, game_state: GameState, action_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -272,7 +293,7 @@ class GameFlowController:
         
         return {
             "narrative": narrative,
-            "options": ["Continue", "Try something else", "Check status"]
+            "options": ["Continue", "Eat shit", "Chase ass"]
         }
     
     def add_action_handler(self, action_type: str, handler_func):

@@ -109,13 +109,13 @@ Make it mysterious and atmospheric, with potential for interaction.""",
             raise ValueError(f"Template '{template_name}' not found")
         
         system_prompt, user_prompt = template.render(**kwargs)
-        return await self._call_ollama(system_prompt, user_prompt)
+        return self._call_ollama(system_prompt, user_prompt)
     
     async def generate_raw(self, system_prompt: str, user_prompt: str) -> str:
         """Generate text with raw prompts (no template)"""
-        return await self._call_ollama(system_prompt, user_prompt)
+        return self._call_ollama(system_prompt, user_prompt)
     
-    async def _call_ollama(self, system_prompt: str, user_prompt: str) -> str:
+    def _call_ollama(self, system_prompt: str, user_prompt: str) -> str:
         """Make the actual API call to Ollama"""
         try:
             payload = {
@@ -138,9 +138,22 @@ Make it mysterious and atmospheric, with potential for interaction.""",
             return result["message"]["content"]
             
         except requests.exceptions.RequestException as e:
+            # Return a fallback response when Ollama is unavailable
+            if "404" in str(e) or "Connection" in str(e):
+                return self._get_fallback_response(system_prompt, user_prompt)
             return f"Error communicating with Ollama: {e}"
         except Exception as e:
             return f"Unexpected error: {e}"
+    
+    def _get_fallback_response(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate fallback responses when Ollama is unavailable"""
+        if "action_interpreter" in system_prompt.lower():
+            return '{"intent": "general action", "risk_level": "low", "mechanics": [], "needs_roll": false}'
+        elif "world_builder" in system_prompt.lower():
+            return "You find yourself in a mysterious location shrouded in mist. Ancient stone ruins emerge from the fog, their purpose lost to time. Strange symbols are carved into weathered walls, and you hear distant echoes that might be wind... or something else."
+        else:
+            # General gamemaster response
+            return f"The world responds to your actions in ways both familiar and strange. You sense that your journey through the Mythic Bastionland is just beginning, full of mysteries waiting to be uncovered."
     
     def build_game_context(self, game_state: Any) -> str:
         """Build context string from game state for prompts"""
