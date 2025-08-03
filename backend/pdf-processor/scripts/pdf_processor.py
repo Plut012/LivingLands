@@ -13,7 +13,7 @@ from typing import Optional, List, Tuple
 import gc
 
 import torch
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+from transformers import Qwen2_5VLForConditionalGeneration, AutoProcessor
 from PIL import Image
 import fitz  # PyMuPDF
 from tqdm import tqdm
@@ -57,7 +57,7 @@ class PDFProcessor:
             torch_dtype = dtype_map.get(TORCH_DTYPE, torch.float16)
             
             # Load model with optimizations
-            self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+            self.model = Qwen2_5VLForConditionalGeneration.from_pretrained(
                 self.model_name,
                 torch_dtype=torch_dtype,
                 device_map=DEVICE_MAP,
