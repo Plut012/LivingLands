@@ -119,11 +119,9 @@ class PDFProcessor:
         )
         
         # Prepare inputs
-        image_inputs, video_inputs = self.processor.process_vision_info(messages)
         inputs = self.processor(
             text=[text],
-            images=image_inputs,
-            videos=video_inputs,
+            images=[image],
             padding=True,
             return_tensors="pt"
         )
