@@ -149,8 +149,9 @@ const HexMap = {
                     fillColor = this.config.colors.explored;
                 }
                 if (window.GameState && 
-                    window.GameState.currentLocation.x === q && 
-                    window.GameState.currentLocation.y === r) {
+                    window.GameState.currentLocation && 
+                    window.GameState.currentLocation.q === q && 
+                    window.GameState.currentLocation.r === r) {
                     fillColor = this.config.colors.current;
                 }
                 
@@ -262,7 +263,10 @@ const HexMap = {
                 e.clientY - rect.top
             );
             
-            // Broadcast hex click event
+            // Send movement command through main API
+            this.handleHexClick(hex);
+            
+            // Broadcast hex click event for other modules
             window.ModuleManager.broadcast('hex:clicked', hex);
         });
         
@@ -280,8 +284,14 @@ const HexMap = {
     handleEvent(event, data) {
         switch(event) {
             case 'render':
-                this.state.exploredHexes = new Set(data.exploredHexes || []);
-                this.render();
+                // Use the new updateFromGameState method for full state updates
+                if (data && data.world_data) {
+                    this.updateFromGameState(data);
+                } else {
+                    // Fallback for old format
+                    this.state.exploredHexes = new Set(data.exploredHexes || []);
+                    this.render();
+                }
                 break;
                 
             case 'hex:explore':
@@ -300,7 +310,49 @@ const HexMap = {
         }
     },
     
-    // Step 11: Utility functions
+    // Step 11: Hex click handling
+    async handleHexClick(hex) {
+        // Don't move if clicking current position
+        if (window.GameState && 
+            window.GameState.currentLocation && 
+            window.GameState.currentLocation.q === hex.q && 
+            window.GameState.currentLocation.r === hex.r) {
+            return;
+        }
+        
+        // Send movement command through main game API
+        if (window.Game && window.Game.processCommand) {
+            const command = `move to ${hex.q},${hex.r}`;
+            await window.Game.processCommand(command);
+        }
+    },
+    
+    // Update game state integration
+    updateFromGameState(gameState) {
+        if (!gameState || !gameState.world_data) return;
+        
+        // Update current position
+        if (gameState.world_data.position) {
+            window.GameState.currentLocation = {
+                q: gameState.world_data.position.q,
+                r: gameState.world_data.position.r
+            };
+        }
+        
+        // Update explored hexes
+        if (gameState.world_data.hexes) {
+            this.state.exploredHexes.clear();
+            Object.entries(gameState.world_data.hexes).forEach(([key, hexData]) => {
+                if (hexData.explored) {
+                    this.state.exploredHexes.add(key);
+                }
+            });
+        }
+        
+        this.render();
+    },
+
+    // Step 12: Utility functions
     centerOn(q, r) {
         const { x, y } = this.hexToPixel(q, r);
         this.state.offset.x = -x + this.canvas.width / 2;
@@ -308,3 +360,6 @@ const HexMap = {
         this.render();
     }
 };
+
+// Export for other modules
+window.HexMap = HexMap;

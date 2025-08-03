@@ -9,7 +9,7 @@
 const GameState = {
     // Current game session
     sessionId: null,
-    currentLocation: { x: 0, y: 0 },
+    currentLocation: { q: 0, r: 0 },
     
     // Character state
     character: {
@@ -159,6 +159,11 @@ const Game = {
             ModuleManager.register('terminal', window.Terminal);
         }
         
+        // Register hex map if it exists
+        if (window.HexMap) {
+            ModuleManager.register('hexMap', window.HexMap);
+        }
+        
         // Initialize modules
         ModuleManager.initialize();
         
@@ -200,6 +205,14 @@ const Game = {
             // Update game state
             if (response.game_state) {
                 this.updateState(response.game_state);
+                
+                // Update current position from world_data
+                if (response.game_state.world_data && response.game_state.world_data.position) {
+                    GameState.currentLocation = {
+                        q: response.game_state.world_data.position.q,
+                        r: response.game_state.world_data.position.r
+                    };
+                }
             }
             
             // Display narrative response
