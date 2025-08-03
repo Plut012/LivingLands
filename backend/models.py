@@ -1,134 +1,190 @@
-"""
-models.py - Core Game Models for Mythic Bastionlands
+"""models.py - Minimal Game Models for Development
 
-PLAN:
-1. Define Character class with virtues, guard, equipment
-2. Define Company class to manage knights and squires
-3. Define WorldHex class for map locations
-4. Define GameSession class for game state
-5. Define CombatState class for active fights
-
-FRAMEWORK:
-- Use dataclasses for clean, simple data structures
-- Keep relationships simple (lists, dictionaries)
-- Focus on core attributes only
+SIMPLE GAME STATE:
+- Basic character representation
+- Flexible game state storage
+- Easy to extend and modify
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
-from enum import Enum
+from typing import List, Dict, Optional, Any, Tuple
+from datetime import datetime
 
-# STEP 1: Define basic enums for game constants
-class VirtueType(Enum):
-    VIGOUR = "VIG"
-    CLARITY = "CLA"
-    SPIRIT = "SPI"
-
-class WeaponType(Enum):
-    HEFTY = "hefty"
-    LONG = "long"
-    HAND = "hand"
-
-# STEP 2: Define Character class
 @dataclass
-class Character:
-    """Represents a Knight or Squire"""
-    name: str
-    virtues: Dict[VirtueType, int]  # VIG, CLA, SPI values
-    guard: int  # GD value
-    max_guard: int
-    equipment: List[str] = field(default_factory=list)
-    wounds: List[str] = field(default_factory=list)  # Current wounds/scars
-    is_knight: bool = True
+class Hex:
+    """Hex tile for the world map"""
+    q: int  # Column coordinate
+    r: int  # Row coordinate  
+    explored: bool = False
+    discovered_at: Optional[datetime] = None
     
     def __post_init__(self):
-        # STEP 2.1: Validate virtues are within range 0-19
-        for virtue, value in self.virtues.items():
-            if not 0 <= value <= 19:
-                raise ValueError(f"{virtue.value} must be between 0 and 19")
+        if self.explored and self.discovered_at is None:
+            self.discovered_at = datetime.now()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "q": self.q,
+            "r": self.r,
+            "explored": self.explored,
+            "discovered_at": self.discovered_at.isoformat() if self.discovered_at else None
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Hex':
+        """Create Hex from dictionary"""
+        discovered_at = None
+        if data.get("discovered_at"):
+            discovered_at = datetime.fromisoformat(data["discovered_at"])
+        
+        return cls(
+            q=data["q"],
+            r=data["r"],
+            explored=data.get("explored", False),
+            discovered_at=discovered_at
+        )
 
-# STEP 3: Define Company class
 @dataclass
-class Company:
-    """A group of Knights (and possibly Squires)"""
+class Character:
+    """Simple character representation"""
     name: str
-    knights: List[Character] = field(default_factory=list)
-    squires: List[Character] = field(default_factory=list)
+    description: Optional[str] = None
+    player_party: Optional[bool] = None
+    # age: Optional[int] = None
+    stats: Dict[str, int] = field(default_factory=dict)  # Flexible stats (VIG, CLA, SPI, etc.)
+    inventory: List[str] = field(default_factory=list)
+    status: Dict[str, Any] = field(default_factory=dict)  # Wounds, conditions, etc.
     
-    def get_all_members(self) -> List[Character]:
-        """Return all company members"""
-        return self.knights + self.squires
-
-# STEP 4: Define WorldHex class
-@dataclass
-class WorldHex:
-    """A hex on the game map"""
-    coordinates: Tuple[int, int]  # (x, y) hex coordinates
-    landmark: Optional[str] = None
-    myth_id: Optional[int] = None
-    current_omen: int = 0  # Which omen is active (0-6)
-    explored: bool = False
+    def get_stat(self, stat_name: str, default: int = 0) -> int:
+        """Get a character stat with default value"""
+        return self.stats.get(stat_name, default)
     
-    def has_myth(self) -> bool:
-        """Check if this hex contains a myth"""
-        return self.myth_id is not None
+    def set_stat(self, stat_name: str, value: int):
+        """Set a character stat"""
+        self.stats[stat_name] = value
 
-# STEP 5: Define GameSession class
+# @dataclass
+# class Knight(Character):
+#     super.__init__()
+#     passion: str
+#     ability: str
+
 @dataclass
-class GameSession:
-    """Current game state"""
+class GameState:
+    """Flexible game state container"""
     session_id: str
-    company: Company
-    current_hex: Tuple[int, int]
-    world_hexes: Dict[Tuple[int, int], WorldHex] = field(default_factory=dict)
-    active_combat: Optional['CombatState'] = None
-    turn_count: int = 0
+    time_of_day: str
+    recent_user_intent: str = field(default_factory=str)
+    characters: List[Character] = field(default_factory=list)
+    world_data: Dict[str, Any] = field(default_factory=dict)  # Current location, discovered areas, etc.
+    game_data: Dict[str, Any] = field(default_factory=dict)   # Turn count, active events, etc.
+    history: List[Dict[str, Any]] = field(default_factory=list)  # Action history for context
+    created_at: datetime = field(default_factory=datetime.now)
     
-    def get_current_hex(self) -> WorldHex:
-        """Get the hex the company is currently in"""
-        return self.world_hexes.get(self.current_hex)
-
-# STEP 6: Define CombatState class
-@dataclass
-class CombatState:
-    """Active combat encounter"""
-    combatants: List[Dict]  # List of all fighters with stats
-    initiative_order: List[int] = field(default_factory=list)  # Indices into combatants
-    current_turn: int = 0
-    round_number: int = 1
+    def add_history_entry(self, action: str, result: str, context: Dict[str, Any] = None):
+        """Add an entry to the game history"""
+        entry = {
+            "action": action,
+            "result": result,
+            "context": context or {},
+            "timestamp": datetime.now()
+        }
+        self.history.append(entry)
     
-    def get_active_combatant(self) -> Dict:
-        """Get the current acting combatant"""
-        if self.initiative_order:
-            return self.combatants[self.initiative_order[self.current_turn]]
+    def get_main_character(self) -> Optional[Character]:
+        """Get the first character (main character)"""
+        return self.characters[0] if self.characters else None
+    
+    def get_current_position(self) -> Tuple[int, int]:
+        """Get current hex position as (q, r) tuple"""
+        pos = self.world_data.get("position", {"q": 0, "r": 0})
+        return (pos["q"], pos["r"])
+    
+    def set_position(self, q: int, r: int):
+        """Set current hex position"""
+        self.world_data["position"] = {"q": q, "r": r}
+    
+    def get_hex(self, q: int, r: int) -> Optional[Hex]:
+        """Get hex at coordinates"""
+        hex_key = f"{q},{r}"
+        hex_data = self.world_data.get("hexes", {}).get(hex_key)
+        if hex_data:
+            return Hex.from_dict(hex_data)
         return None
+    
+    def set_hex(self, hex_obj: Hex):
+        """Store hex data"""
+        hex_key = f"{hex_obj.q},{hex_obj.r}"
+        if "hexes" not in self.world_data:
+            self.world_data["hexes"] = {}
+        self.world_data["hexes"][hex_key] = hex_obj.to_dict()
+    
+    def mark_hex_explored(self, q: int, r: int):
+        """Mark a hex as explored"""
+        hex_obj = self.get_hex(q, r)
+        if hex_obj:
+            hex_obj.explored = True
+            hex_obj.discovered_at = datetime.now()
+        else:
+            hex_obj = Hex(q=q, r=r, explored=True)
+        self.set_hex(hex_obj)
 
-# STEP 7: Simple factory functions
-def create_knight(name: str, vig: int, cla: int, spi: int, gd: int) -> Character:
-    """Create a new Knight character"""
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            "session_id": self.session_id,
+            "characters": [{
+                "name": c.name,
+                "stats": c.stats,
+                "inventory": c.inventory,
+                "status": c.status
+            } for c in self.characters],
+            "world_data": self.world_data,
+            "game_data": self.game_data,
+            "history": self.history[-10:],  # Last 10 entries only
+            "created_at": self.created_at.isoformat()
+        }
+
+# Helper functions
+def create_knight(name: str, description: str, player_party: bool, stats: Dict[str, int] = None) -> Character:
+    """Create a basic character with default stats"""
+    # ROLL to select knight - IMPORTANT from set of knights not in world already
+    # Get knights special traits: passion, ability, items, ...
+
+    # TODO if stats = None - roll for stats
+    default_stats = {"VIG": 10, "CLA": 10, "SPI": 10, "GD": 5}
+    if stats:
+        default_stats.update(stats)
+    
     return Character(
         name=name,
-        virtues={
-            VirtueType.VIGOUR: vig,
-            VirtueType.CLARITY: cla,
-            VirtueType.SPIRIT: spi
-        },
-        guard=gd,
-        max_guard=gd,
-        is_knight=True
+        description=description,
+        player_party=player_party,
+        stats=default_stats,
+        inventory=["basic gear"],
+        status={"wounds": 0, "conditions": []}
     )
 
-def create_squire(name: str) -> Character:
-    """Create a new Squire with fixed stats"""
-    return Character(
-        name=name,
-        virtues={
-            VirtueType.VIGOUR: 7,
-            VirtueType.CLARITY: 7,
-            VirtueType.SPIRIT: 2
+def create_new_game(session_id: str, character_name: str, description: str) -> GameState:
+    """Create a new game session"""
+    character = create_knight(character_name, description, player_party=True)
+    
+    # Create starting hex
+    starting_hex = Hex(q=0, r=0, explored=True)
+    
+    game_state = GameState(
+        session_id=session_id,
+        characters=[character],
+        time_of_day='morning',
+        recent_user_intent='',
+        world_data={
+            "current_location": "Starting Area", 
+            "discovered_areas": [],
+            "position": {"q": 0, "r": 0},  # Starting hex position
+            "hexes": {"0,0": starting_hex.to_dict()}  # Initialize with starting hex
         },
-        guard=6,
-        max_guard=6,
-        is_knight=False,
-        equipment=["dagger", "torches", "rope"]
+        game_data={"turn_count": 0, "active_events": []}
     )
+    
+    return game_state

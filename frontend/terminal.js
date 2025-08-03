@@ -25,8 +25,10 @@ const Terminal = {
         // Set up event listeners
         this.setupInputHandlers();
         
-        // Register with module manager
-        window.ModuleManager.register('terminal', this);
+        // Register with module manager (only if it exists)
+        if (window.ModuleManager) {
+            window.ModuleManager.register('terminal', this);
+        }
     },
     
     // Step 3: Input handling
@@ -196,6 +198,9 @@ const Terminal = {
         this.scrollToBottom();
     }
 };
+
+// Export to global scope
+window.Terminal = Terminal;
 
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {

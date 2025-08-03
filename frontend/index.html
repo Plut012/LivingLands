@@ -53,10 +53,18 @@
         
         <!-- Step 3: Terminal Interface -->
         <section class="terminal-section">
-            <div class="terminal-output" id="terminal-output"></div>
-            <div class="terminal-input-line">
-                <span class="prompt">></span>
-                <input type="text" id="terminal-input" class="terminal-input" autofocus>
+            <div class="intent-buttons">
+                <button class="intent-btn" data-intent="Travel">Travel</button>
+                <button class="intent-btn" data-intent="Rest">Rest</button>
+                <button class="intent-btn" data-intent="Talk">Talk</button>
+                <button class="intent-btn" data-intent="Fight">Fight</button>
+            </div>
+            <div class="terminal-content">
+                <div class="terminal-output" id="terminal-output"></div>
+                <div class="terminal-input-line">
+                    <span class="prompt">></span>
+                    <input type="text" id="terminal-input" class="terminal-input" autofocus>
+                </div>
             </div>
         </section>
         
@@ -82,5 +90,6 @@
     <script src="tab-manager.js"></script>
     <script src="inventory.js"></script>
     <script src="atmosphere.js"></script>
+    <script src="intent-buttons.js"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@
     --bg-light: #2a2a2a;
     --text-primary: #e0e0e0;
     --text-dim: #808080;
-    --accent-green: #00ff00;
+    --accent-purple: #6a0dad;
     --accent-red: #ff0040;
     --virtue-vigour: #ff6b6b;
     --virtue-clarity: #4ecdc4;
@@ -149,8 +149,47 @@ body {
     background: var(--bg-dark);
     border-top: 1px solid var(--bg-light);
     display: flex;
-    flex-direction: column;
     padding: 10px;
+    gap: 10px;
+}
+
+.intent-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.intent-btn {
+    background: var(--bg-medium);
+    border: 1px solid var(--bg-light);
+    color: var(--text-dim);
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.intent-btn:hover {
+    background: var(--bg-light);
+    color: var(--text-primary);
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 8px rgba(106, 13, 173, 0.3);
+}
+
+.intent-btn:active,
+.intent-btn.selected {
+    background: var(--accent-purple);
+    color: var(--text-primary);
+    border-color: var(--accent-purple);
+    box-shadow: 0 0 12px rgba(106, 13, 173, 0.5);
+}
+
+.terminal-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .terminal-output {
@@ -173,7 +212,7 @@ body {
 }
 
 .prompt {
-    color: var(--accent-green);
+    color: var(--accent-purple);
 }
 
 .terminal-input {
