@@ -1,7 +1,7 @@
 """Configuration settings for PDF processor."""
 
 # Model configuration
-MODEL_NAME = "Qwen/Qwen2.5-VL-7B-Instruct"
+MODEL_NAME = "Qwen/Qwen2-VL-7B-Instruct"
 TORCH_DTYPE = "float16"  # Options: float16, float32, bfloat16
 DEVICE_MAP = "auto"  # Let transformers handle device placement
 
