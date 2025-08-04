@@ -9,6 +9,7 @@ SIMPLE GAME STATE:
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime
+from backend.game.dice_roller import roll_dice
 
 @dataclass
 class Hex:
@@ -16,11 +17,9 @@ class Hex:
     q: int  # Column coordinate
     r: int  # Row coordinate  
     explored: bool = False
-    discovered_at: Optional[datetime] = None
-    
-    def __post_init__(self):
-        if self.explored and self.discovered_at is None:
-            self.discovered_at = datetime.now()
+    landscape: str
+    landmark: Optional[str] = None
+    omen: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
@@ -28,21 +27,22 @@ class Hex:
             "q": self.q,
             "r": self.r,
             "explored": self.explored,
-            "discovered_at": self.discovered_at.isoformat() if self.discovered_at else None
+            "landscape": self.landscape,
+            "landmark": self.landmark,
+            "omen": self.omen,
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Hex':
         """Create Hex from dictionary"""
-        discovered_at = None
-        if data.get("discovered_at"):
-            discovered_at = datetime.fromisoformat(data["discovered_at"])
         
         return cls(
             q=data["q"],
             r=data["r"],
             explored=data.get("explored", False),
-            discovered_at=discovered_at
+            landscape=data.get("landscape", "unknown"),
+            landmark=data.get("landmark"),
+            omen=data.get("omen"),
         )
 
 @dataclass
@@ -52,23 +52,47 @@ class Character:
     description: Optional[str] = None
     player_party: Optional[bool] = None
     # age: Optional[int] = None
-    stats: Dict[str, int] = field(default_factory=dict)  # Flexible stats (VIG, CLA, SPI, etc.)
+
+    full_vigour: int
+    full_clarity: int
+    full_spirit: int
+    full_guard: int
+
+    vigour: int
+    clarity: int
+    spirit: int
+    guard: int
+
+    fatigued: bool
+    feats: List[str]
+    scars: List[str]
     inventory: List[str] = field(default_factory=list)
     status: Dict[str, Any] = field(default_factory=dict)  # Wounds, conditions, etc.
     
     def get_stat(self, stat_name: str, default: int = 0) -> int:
         """Get a character stat with default value"""
-        return self.stats.get(stat_name, default)
+        stat_map = {
+            'vigour': self.vigour, 'clarity': self.clarity, 
+            'spirit': self.spirit, 'guard': self.guard
+        }
+        return stat_map.get(stat_name.lower(), default)
     
     def set_stat(self, stat_name: str, value: int):
         """Set a character stat"""
-        self.stats[stat_name] = value
+        if stat_name.lower() == 'vigour':
+            self.vigour = value
+        elif stat_name.lower() == 'clarity':
+            self.clarity = value
+        elif stat_name.lower() == 'spirit':
+            self.spirit = value
+        elif stat_name.lower() == 'guard':
+            self.guard = value
 
-# @dataclass
-# class Knight(Character):
-#     super.__init__()
-#     passion: str
-#     ability: str
+@dataclass
+class Knight(Character):
+    passion: str = ""
+    ability: str = ""
+    #steed: Optional[str] = None 
 
 @dataclass
 class GameState:
@@ -125,9 +149,8 @@ class GameState:
         hex_obj = self.get_hex(q, r)
         if hex_obj:
             hex_obj.explored = True
-            hex_obj.discovered_at = datetime.now()
         else:
-            hex_obj = Hex(q=q, r=r, explored=True)
+            hex_obj = Hex(q=q, r=r, explored=True, landscape="unexplored")
         self.set_hex(hex_obj)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -136,7 +159,10 @@ class GameState:
             "session_id": self.session_id,
             "characters": [{
                 "name": c.name,
-                "stats": c.stats,
+                "vigour": c.vigour,
+                "clarity": c.clarity,
+                "spirit": c.spirit,
+                "guard": c.guard,
                 "inventory": c.inventory,
                 "status": c.status
             } for c in self.characters],
@@ -152,16 +178,33 @@ def create_knight(name: str, description: str, player_party: bool, stats: Dict[s
     # ROLL to select knight - IMPORTANT from set of knights not in world already
     # Get knights special traits: passion, ability, items, ...
 
-    # TODO if stats = None - roll for stats
-    default_stats = {"VIG": 10, "CLA": 10, "SPI": 10, "GD": 5}
+    # Roll for stats if not provided
     if stats:
-        default_stats.update(stats)
+        vigour = stats.get("vigour", roll_dice(12)[0] + roll_dice(6)[0])
+        clarity = stats.get("clarity", roll_dice(12)[0] + roll_dice(6)[0])
+        spirit = stats.get("spirit", roll_dice(12)[0] + roll_dice(6)[0])
+        guard = stats.get("guard", roll_dice(6)[0])
+    else:
+        vigour = roll_dice(12)[0] + roll_dice(6)[0]
+        clarity = roll_dice(12)[0] + roll_dice(6)[0]
+        spirit = roll_dice(12)[0] + roll_dice(6)[0]
+        guard = roll_dice(6)[0]
     
     return Character(
         name=name,
         description=description,
         player_party=player_party,
-        stats=default_stats,
+        full_vigour=vigour,
+        full_clarity=clarity,
+        full_spirit=spirit,
+        full_guard=guard,
+        vigour=vigour,
+        clarity=clarity,
+        spirit=spirit,
+        guard=guard,
+        fatigued=False,
+        feats=[],
+        scars=[],
         inventory=["basic gear"],
         status={"wounds": 0, "conditions": []}
     )
@@ -171,7 +214,7 @@ def create_new_game(session_id: str, character_name: str, description: str) -> G
     character = create_knight(character_name, description, player_party=True)
     
     # Create starting hex
-    starting_hex = Hex(q=0, r=0, explored=True)
+    starting_hex = Hex(q=0, r=0, explored=True, landscape="starting_area")
     
     game_state = GameState(
         session_id=session_id,

@@ -13,6 +13,7 @@ import json
 import logging
 import re
 from models import GameState, Character, create_new_game, Hex
+from backend.game.dice_roller import roll_dice
 from game.ollama_client import ollama
 
 logger = logging.getLogger(__name__)
@@ -47,9 +48,9 @@ class GameFlowController:
             return {"error": "Session not found"}
 
         # Check for movement intent first
-        if selected_intent == 'movement' or self._detect_movement_intent(player_input):
-            logger.info("Detected movement intent")
-            return await self._handle_movement(game_state, {'intent': 'movement', 'player_input': player_input})
+        #if selected_intent == 'movement' or self._detect_movement_intent(player_input):
+        #    logger.info("Detected movement intent")
+        #    return await self._handle_movement(game_state, {'intent': 'movement', 'player_input': player_input})
 
         if selected_intent:    # when button pressed, update recent user intent
             # update game state
@@ -62,14 +63,14 @@ class GameFlowController:
         try:
             # Step 1: Interpret the player's action
             if not selected_intent:
-                logger.debug("Step 1: Interpreting player action")
+                logger.debug("Interpreting player action")
                 action_data = await self._interpret_action(game_state, player_input)
-                logger.info(f"Action interpreted as: {action_data.get('intent', 'unknown')}")
             
             # Step 2: Execute the action
-            logger.debug("Step 2: Executing action")
+            logger.debug("Executing action")
             result = await self._execute_action(game_state, action_data)
-            logger.info(f"Action executed successfully")
+
+            # TODO if combat? 
             
             # Step 3: Update game state
             logger.debug("Step 3: Updating game state")
@@ -79,10 +80,8 @@ class GameFlowController:
                 context=action_data
             )
             turn_count = game_state.game_data.get("turn_count", 0) + 1
-            game_state.game_data["turn_count"] = turn_count
-            logger.info(f"Game state updated, turn count now: {turn_count}")
             
-            # Step 4: Generate response
+            # Step 4: Generate API response
             logger.debug("Step 4: Generating response")
             response = {
                 "session_id": session_id,
@@ -93,8 +92,10 @@ class GameFlowController:
             }
             
             logger.info(f"Action processing completed successfully for session {session_id}")
-            # TODO clear user intent
             game_state.recent_user_intent = None
+
+            # TODO move to next phase
+
             return response
             
         except Exception as e:
@@ -214,9 +215,9 @@ class GameFlowController:
         main_char = game_state.get_main_character()
         if main_char:
             # Restore some stats
-            for stat in ["VIG", "CLA", "SPI"]:
-                current = main_char.get_stat(stat, 10)
-                main_char.set_stat(stat, min(current + 2, 20))  # Cap at 20
+            main_char.vigour = min(main_char.vigour + 2, main_char.full_vigour)
+            main_char.clarity = min(main_char.clarity + 2, main_char.full_clarity)
+            main_char.spirit = min(main_char.spirit + 2, main_char.full_spirit)
         
         narrative = "You rest and recover your strength. Your vitality and clarity improve."
         
@@ -252,11 +253,12 @@ class GameFlowController:
             f"Location: {game_state.world_data.get('current_location', 'Unknown')}",
             f"Turn: {game_state.game_data.get('turn_count', 0)}",
             "",
-            "**Stats:**"
+            "**Stats:**",
+            f"  Vigour: {main_char.vigour}/{main_char.full_vigour}",
+            f"  Clarity: {main_char.clarity}/{main_char.full_clarity}",
+            f"  Spirit: {main_char.spirit}/{main_char.full_spirit}",
+            f"  Guard: {main_char.guard}/{main_char.full_guard}"
         ]
-        
-        for stat, value in main_char.stats.items():
-            status_parts.append(f"  {stat}: {value}")
         
         if main_char.inventory:
             status_parts.extend(["", "**Inventory:**"])
